@@ -1,0 +1,933 @@
+---
+title: "Case_Study_2_DDS"
+author: "Braden Anderson"
+date: "11/23/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r}
+
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+
+# TODO: 
+# 1. Identify the top 3 factors that contribute to turn over.
+# 2. Identify any job role specific trends in the data.
+# 3. Build a model to predict attrition
+# 4. Build a model that can predict income
+
+```
+
+```{r include=FALSE}
+source("./functions.R")
+```
+
+```{r echo=FALSE}
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+head(df)
+```
+
+
+# PART 1: EDA AND FILTER BASED FEATURE SELECTION
+
+```{r fig.height=5, fig.width=14}
+
+plot_histogram_by_level(df=df, 
+                        continuous_variable="Salary", 
+                        num_bins = 100,
+                        v_line_ymax = 35 )
+
+```
+
+```{r fig.height=5, fig.width=14}
+
+plot_histogram_by_level(df=df, 
+                        continuous_variable="Salary", 
+                        num_bins = 100, 
+                        test_type="rank_sum", 
+                        v_line_ymax = 35)
+```
+
+
+```{r fig.height=5, fig.width=14}
+
+df[,"Log_Monthly_Income"] <- log(df[,"MonthlyIncome"])
+
+plot_histogram_by_level(df=df, 
+                        continuous_variable="Log_Monthly_Income", 
+                        num_bins = 100)
+
+
+```
+
+```{r fig.height=5, fig.width=14}
+
+plot_histogram_by_level(df=df, 
+                        continuous_variable="Age", 
+                        binwidth=1)
+
+```
+
+```{r fig.height=5, fig.width=14}
+
+plot_histogram_by_level(df=df, 
+                        continuous_variable="PercentSalaryHike", 
+                        binwidth=1, 
+                        v_line_ymax = 90)
+
+```
+
+```{r fig.height=5, fig.width=14}
+
+plot_histogram_by_level(df=df, 
+                        continuous_variable="DistanceFromHome", 
+                        v_line_ymax = 80)
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="BusinessTravel")
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="Department")
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="EnvironmentSatisfaction")
+
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="JobInvolvement")
+
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="JobInvolvementB")
+
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="JobRole", 
+                             x_rotation = 35)
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="MaritalStatus")
+
+```
+
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="PerformanceRating")
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="OverTime")
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="WorkLifeBalance")
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="WorkLifeBalanceB")
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="Gender")
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="Education")
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="JobSatisfaction")
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="StockOptionLevel")
+
+```
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="RelationshipSatisfaction")
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="TrainingTimesLastYear")
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="JobLevel")
+
+```
+
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="JobLevelB")
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="EducationField")
+
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="NumCompaniesWorked")
+
+```
+
+```{r}
+# Combined 0 through 4, and 5 through 9.
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="NumCompaniesWorkedB")
+```
+
+```{r}
+
+plot_categorical_proportions(df=df, 
+                             categorical_predictor="YearsSinceLastPromotion")
+
+```
+
+```{r}
+
+# After first pass of EDA, current variables of interest are...
+#
+# Variables to keep: EnvironmentSatisfaction OverTime Salary JobSatisfaction JobInvolvement
+#                    MaritalStatus JobLevel NumCompaniesWorked WorkLifeBalance
+# 
+#
+# Maybes: Age DistanceFromHome JobRole StockOptionLevel YearsAtCompany Education
+#         TotalWorkingYears YearsInCurrentRole BusinessTravel EducationField Department 
+#         RelationshipSatisfaction YearsWithCurrManager
+#        
+#
+# 
+# No's: Gender PercentSalaryHike PerformanceRating TrainingTimesLastYear YearsSinceLastPromotion
+#       EmployeeNumber 
+#
+#
+# VARIABLES TO TRY BINNING: RelationshipSatisfaction WorkLifeBalance NumCompaniesWorked
+#                           JobLevel JobInvolvement YearsInCurrentRole EnvironmentSatisfaction
+ 
+```
+
+
+
+# Relief Scores Section
+```{r, fig.height=6, fig.width=10}
+
+# TEST 1: INCLUDING ALL FEATURES
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("EnvironmentSatisfaction", "OverTime", "Salary", "JobSatisfaction", "JobInvolvement", "MaritalStatus",
+              "JobLevel", "NumCompaniesWorked", "WorkLifeBalance", "Age", "DistanceFromHome", "JobRole", "StockOptionLevel", 
+              "YearsAtCompany", "Education", "TotalWorkingYears", "YearsInCurrentRole",
+              "BusinessTravel", "EducationField", "Department",
+              "RelationshipSatisfaction", "YearsWithCurrManager", "Gender", "PercentSalaryHike", "PerformanceRating",
+              "TrainingTimesLastYear", "YearsSinceLastPromotion")
+
+# COMMENTED OUT SO IT DOESN'T ACCIDENTALLY GET RE-RUN, THE 
+# .CSV FILE IS ALL THAT IS NEEDED NOW.
+# relief_df1 <- calculate_relief_scores(df=df, 
+#                               features=features, 
+#                               binary_target="Attrition", 
+#                               save_path="./test1_relief_all.csv")
+
+
+relief_df1 <- read.csv("./test1_relief_all.csv")
+plot_standardized_relief(relief_df=relief_df1, score_type="standardized")
+
+```
+
+
+
+```{r, fig.height=6, fig.width=10}
+
+# TEST 1B: INCLUDING ALL FEATURES
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+
+# ALL FEATURES, INCLUDING BINNED AND NOT BINNED VERSIONS WHERE APPLICABLE.
+all_features <- c("EnvironmentSatisfaction", "OverTime", "Salary", "JobSatisfaction", "JobInvolvement", 
+              "MaritalStatus","JobLevel", "NumCompaniesWorked", "WorkLifeBalance", "Age", 
+              "DistanceFromHome", "JobRole", "StockOptionLevel", "YearsAtCompany", "Education", 
+              "TotalWorkingYears", "YearsInCurrentRole", "BusinessTravel", "EducationField", "Department",
+              "RelationshipSatisfaction", "YearsWithCurrManager", "Gender", "PercentSalaryHike", "PerformanceRating",
+              "TrainingTimesLastYear", "YearsSinceLastPromotion", "RelationshipSatisfactionB", "WorkLifeBalanceB",
+              "NumCompaniesWorkedB", "JobLevelB", "JobInvolvementB", "EnvironmentSatisfactionB")
+
+
+# COMMENTED OUT SO IT DOESN'T ACCIDENTALLY GET RE-RUN, THE 
+# .CSV FILE IS ALL THAT IS NEEDED NOW.
+# relief_df1b <- calculate_relief_scores(df=df, 
+#                                       features=all_features, 
+#                                       binary_target="Attrition", 
+#                                       save_path="./test1B_relief_all_including_binned.csv")
+
+
+relief_df1b <- read.csv("./test1B_relief_all_including_binned.csv")
+plot_standardized_relief(relief_df=relief_df1b, score_type="standardized")
+
+```
+
+
+
+```{r, fig.height=5, fig.width=10}
+
+# TEST 2: ONLY INCLUDING "YES" AND "MAYBE" FEATURES FROM INITIAL EDA
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("EnvironmentSatisfaction", "OverTime", "Salary", "JobSatisfaction", "JobInvolvement", "MaritalStatus",
+              "JobLevel", "NumCompaniesWorked", "WorkLifeBalance", "Age", "DistanceFromHome", "JobRole", "StockOptionLevel", 
+              "YearsAtCompany", "Education", "TotalWorkingYears", "YearsInCurrentRole", "BusinessTravel", 
+              "EducationField","Department","RelationshipSatisfaction", "YearsWithCurrManager")
+
+# COMMENTED OUT SO IT DOESN'T ACCIDENTALLY GET RE-RUN, THE 
+# .CSV FILE IS ALL THAT IS NEEDED NOW.
+# relief_df2 <- calculate_relief_scores(df=df, 
+#                                       features=features, 
+#                                       binary_target="Attrition", 
+#                                       save_path="./test2_relief_yes_maybe.csv")
+
+
+relief_df2 <- read.csv("./test2_relief_yes_maybe.csv")
+plot_standardized_relief(relief_df=relief_df2, score_type="standardized")
+
+```
+
+
+```{r, fig.height=5, fig.width=10}
+
+# TEST 3: ONLY INCLUDING "YES" AND "MAYBE" FEATURES FROM INITIAL EDA, USING BINNED VERSIONS OF 
+#         ALL FEATURES THAT SEEMED LIKE THEY MAY BENEIFIT FROM BINNING
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("EnvironmentSatisfactionB", "OverTime", "Salary", "JobSatisfaction", "JobInvolvementB", "MaritalStatus",
+              "JobLevelB", "NumCompaniesWorkedB", "WorkLifeBalanceB", "Age", "DistanceFromHome", "JobRole", "StockOptionLevel", 
+              "YearsAtCompany", "Education", "TotalWorkingYears", "YearsInCurrentRole", 
+              "BusinessTravel", "EducationField", "Department", "RelationshipSatisfactionB", "YearsWithCurrManager")
+
+
+# COMMENTED OUT SO IT DOESN'T ACCIDENTALLY GET RE-RUN, THE 
+# .CSV FILE IS ALL THAT IS NEEDED NOW.
+# relief_df3 <- calculate_relief_scores(df=df, 
+#                                       features=features, 
+#                                       binary_target="Attrition", 
+#                                       save_path="./test3_relief_yes_maybe_binned.csv")
+
+
+relief_df3 <- read.csv("./test3_relief_yes_maybe_binned.csv")
+plot_standardized_relief(relief_df=relief_df3, score_type="standardized")
+
+```
+
+
+```{r, fig.height=5, fig.width=10}
+
+# TEST 4: ONLY INCLUDING "YES" FEATURES, AND USING BINNED VERSIONS WHERE APPROPRIATE 
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("EnvironmentSatisfactionB", "OverTime", "Salary", "JobSatisfaction", "JobInvolvementB", "MaritalStatus",
+              "JobLevelB", "NumCompaniesWorkedB", "WorkLifeBalanceB")
+
+
+# COMMENTED OUT SO IT DOESN'T ACCIDENTALLY GET RE-RUN, THE 
+# .CSV FILE IS ALL THAT IS NEEDED NOW.
+# relief_df4 <- calculate_relief_scores(df=df, 
+#                                       features=features, 
+#                                       binary_target="Attrition", 
+#                                       save_path="./test4_relief_yes_only_binned.csv")
+
+
+relief_df4 <- read.csv("./test4_relief_yes_only_binned.csv")
+plot_standardized_relief(relief_df=relief_df4, score_type="standardized")
+
+```
+
+
+
+```{r, fig.height=5, fig.width=10}
+
+# TEST 5: TEST BASED ON WHAT HAS PERFORMED WELL ABOVE. 
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+
+features <- c("EnvironmentSatisfactionB", "OverTime", "Salary", "JobSatisfaction", "JobInvolvementB", "MaritalStatus",
+              "JobLevelB", "NumCompaniesWorkedB", "WorkLifeBalanceB", "StockOptionLevel", "YearsAtCompany", "JobRole")
+
+
+# COMMENTED OUT SO IT DOESN'T ACCIDENTALLY GET RE-RUN, THE 
+# .CSV FILE IS ALL THAT IS NEEDED NOW.
+# relief_df5 <- calculate_relief_scores(df=df, 
+#                                       features=features, 
+#                                       binary_target="Attrition", 
+#                                       save_path="./test5_relief_high_performers.csv")
+
+
+relief_df5 <- read.csv("./test5_relief_high_performers.csv")
+plot_standardized_relief(relief_df=relief_df5, score_type="standardized")
+
+```
+
+# Random Forest Importance Scores Section
+```{r, fig.height=6.5, fight.width=16}
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+
+# ALL FEATURES, INCLUDING BINNED AND NOT BINNED VERSIONS WHERE APPLICABLE.
+all_features <- c("EnvironmentSatisfaction", "OverTime", "Salary", "JobSatisfaction", "JobInvolvement", 
+              "MaritalStatus","JobLevel", "NumCompaniesWorked", "WorkLifeBalance", "Age", 
+              "DistanceFromHome", "JobRole", "StockOptionLevel", "YearsAtCompany", "Education", 
+              "TotalWorkingYears", "YearsInCurrentRole", "BusinessTravel", "EducationField", "Department",
+              "RelationshipSatisfaction", "YearsWithCurrManager", "Gender", "PercentSalaryHike", "PerformanceRating",
+              "TrainingTimesLastYear", "YearsSinceLastPromotion", "RelationshipSatisfactionB", "WorkLifeBalanceB",
+              "NumCompaniesWorkedB", "JobLevelB", "JobInvolvementB", "EnvironmentSatisfactionB")
+
+
+plot_rf_importances(df=df, 
+                    features=all_features)
+
+```
+
+
+```{r, fig.height=2.25, fight.width=12}
+
+# ALL FEATURES, INCLUDING BINNED AND NOT BINNED VERSIONS WHERE APPLICABLE.
+features <- c("OverTime", "Salary", "StockOptionLevel","JobInvolvementB", "MaritalStatus","JobLevelB")
+
+plot_rf_importances(df=df, 
+                    features=features, 
+                    txt_angle=0, 
+                    tick_label_rot = 30)
+
+```
+
+
+```{r, fig.height=3, fight.width=12}
+
+features <- c("EnvironmentSatisfactionB", "OverTime", "Salary", "JobSatisfaction", "JobInvolvementB", "MaritalStatus",
+              "JobLevelB", "NumCompaniesWorkedB", "WorkLifeBalanceB", "StockOptionLevel", "YearsAtCompany", "JobRole")
+
+plot_rf_importances(df=df, 
+                    features=features, 
+                    txt_angle=0, 
+                    tick_label_rot = 90)
+
+```
+
+
+# PART 2: MODELING TO PREDICT ATTRITION
+
+# KNN Searches
+```{r}
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df,
+                 char_to_factor = FALSE,
+                 char_to_numeric = TRUE, 
+                 cat_ints_to_factors = FALSE)
+
+features <- c("OverTime", "Salary", "StockOptionLevel", "JobLevelB", "MaritalStatus", "Age", 
+              "YearsAtCompany", "JobSatisfaction","JobInvolvementB","NumCompaniesWorkedB","EnviornmentSatisfactionB", 
+              "Education", "WorkLifeBalanceB")
+
+# COMMENTED OUT TO AVOID RE-RUNNING.
+#knn_gs_df <- cv_knn_feat_sets_manual(df=df,
+#                                     features=features,
+#                                     binary_target = "Attrition",
+#                                     cv_folds = 10,
+#                                     save_path = "./KNN_GS_ALL_FEATURE_SETS_13.csv",
+#                                     start_k=1,
+#                                     end_k=51,
+#                                     step_k=2, 
+#                                     multithread_processes=8,
+#                                     update_status_every=1000)
+
+
+knn_gs_df <- read.csv("./KNN_GS_ALL_FEATURE_SETS_13.csv")
+head(knn_gs_df)
+```
+
+
+# Naive Bayes Searches
+```{r}
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("OverTime", "JobLevelB", "Salary", "MaritalStatus", "StockOptionLevel", "JobRole",
+              "NumCompaniesWorkedB", "JobInvolvementB", "EnviornmentSatisfactionB", "JobSatisfactionB",
+              "YearsAtCompany", "WorkLifeBalanceB", "Department", "Education", "EducationField", "Gender")
+
+
+# COMMENTED OUT TO AVOID RE-RUNNING.
+# cv_df <- cv_nb_feat_sets_manual(df=df, 
+#                                 features=features,
+#                                 binary_target="Attrition",
+#                                 save_path="./NAIVE_BAYES_ALL_SUBSETS_16_FEATURES.csv")
+
+
+# READ IN THE RESULTS OF THE ABOVE SEARCH
+nb_gs_df <- read.csv("./NAIVE_BAYES_ALL_SUBSETS_16_FEATURES.csv")
+head(nb_gs_df)
+```
+
+
+
+# xgboost Searches
+
+```{r}
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("OverTime", "Salary", "StockOptionLevel", "JobLevelB", "YearsWithCurrentManager", 
+              "MaritalStatus", "JobRole", "YearsInCurrentRole", "Age", "YearsAtCompany", "JobSatisfaction",
+              "YearsSinceLastPromotion", "TotalWorkingYears", "JobInvolvementB", "NumCompaniesWorkedB",
+              "EnviornmentSatisfactionB")
+
+# COMMENTED OUT TO AVOID RE-RUNNING
+# xgb_rs1 <- randomsearch_xgboost(df=df, 
+#                                 features=features, 
+#                                 num_trees_lower=25, 
+#                                 num_trees_upper=75, 
+#                                 max_iterations=500)
+
+
+# Metrics for data the model was not trained on (average test set metrics from 10 fold cross validation)
+# xgb_rs1$tuner$y
+
+# Metrics for data the model was trained on, after refitting on full data set
+# xgb_rs1$metrics
+
+# Best hyperparameters found by cross validation
+# xgb_rs1$tuner$x
+
+# generateHyperParsEffectData(tune.result=xgb_rs1$tuner, partial.dep = TRUE)
+
+######################################### SEARCH SUMMARY ######################################### 
+# BEST PARAMS: 
+# eta=0.8302, gamma=3.3339, subsample=0.6128, colsample_bytree=0.93214, nrounds=67, min_child_weight=3.6811
+
+# TEST METRICS:
+# Sensitivity=0.9369, Specificity=0.4642, Accuracy=0.8609
+
+# TRAIN METRICS (After refit on full data set):
+# Sensitivity=0.9753, Specificity=0.7142, Accuracy=0.9333
+###########################################################################################
+```
+
+
+```{r}
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("OverTime", "Salary", "StockOptionLevel", "JobLevelB", "YearsWithCurrentManager", 
+              "MaritalStatus", "JobRole", "YearsInCurrentRole", "Age", "YearsAtCompany", "JobSatisfaction",
+              "YearsSinceLastPromotion", "TotalWorkingYears", "JobInvolvementB", "NumCompaniesWorkedB",
+              "EnviornmentSatisfactionB")
+
+# COMMENTED OUT TO AVOID RERUNNING
+# xgb_rs2 <- randomsearch_xgboost(df=df, 
+#                                features=features, 
+#                                num_trees_lower=65, 
+#                                num_trees_upper=100, 
+#                                max_iterations=500,
+#                                max_depth_lower=10, 
+#                                max_depth_upper=20,
+#                                colsample_lower=0.85, 
+#                                colsample_upper=1,
+#                                min_child_weight_lower=1,
+#                                min_child_weight_upper=5,
+#                                lr_upper=1,
+#                                lr_lower=0.5)
+
+# Metrics for data the model was not trained on (average test set metrics from 10 fold cross validation)
+# xgb_rs2$tuner$y
+
+# Metrics for data the model was trained on, after refitting on full data set
+# xgb_rs2$metrics
+
+# Best hyperparameters found by cross validation
+# xgb_rs2$tuner$x
+
+######################################### SEARCH SUMMARY ######################################### 
+# BEST PARAMS: 
+# eta=, gamma=, subsample=, colsample_bytree=, nrounds=, min_child_weight=
+
+# TEST METRICS:
+# Sensitivity=, Specificity=, Accuracy=
+
+# TRAIN METRICS (After refit on full data set):
+# Sensitivity=, Specificity=, Accuracy=
+###########################################################################################
+
+```
+
+# svm Searches
+```{r}
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("OverTime", "Salary", "StockOptionLevel", "JobLevelB", "YearsWithCurrentManager", 
+              "MaritalStatus", "JobRole", "YearsInCurrentRole", "Age", "YearsAtCompany", "JobSatisfaction",
+              "YearsSinceLastPromotion", "TotalWorkingYears", "JobInvolvementB", "NumCompaniesWorkedB",
+              "EnviornmentSatisfactionB")
+
+# COMMENTED OUT TO AVOID RERUNNING
+#svm_rs1 <- randomsearch_svm(df=df, 
+#                            features=features, 
+#                            max_iterations=50)
+
+
+# Metrics for data the model was not trained on (average test set metrics from 10 fold cross validation)
+# svm_rs1$tuner$y
+
+# Metrics for data the model was trained on, after refitting on full data set
+# svm_rs1$metrics
+
+# Best hyperparameters found by cross validation
+# svm_rs1$tuner$x
+
+```
+
+
+```{r}
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("OverTime", "Salary", "StockOptionLevel", "JobLevelB", "YearsWithCurrentManager", 
+              "MaritalStatus", "JobRole", "YearsInCurrentRole", "Age", "YearsAtCompany", "JobSatisfaction",
+              "YearsSinceLastPromotion", "TotalWorkingYears", "JobInvolvementB", "NumCompaniesWorkedB",
+              "EnviornmentSatisfactionB")
+
+#svm_rs2 <- randomsearch_svm(df=df, 
+#                            features=features,
+#                            kernel_types= c("polynomial"),
+#                            max_iterations=500)
+
+
+# Metrics for data the model was not trained on (average test set metrics from 10 fold cross validation)
+#svm_rs2$tuner$y
+
+# Metrics for data the model was trained on, after refitting on full data set
+#svm_rs2$metrics
+
+# Best hyperparameters found by cross validation
+#svm_rs2$tuner$x
+
+```
+
+
+```{r}
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("OverTime", "Salary", "StockOptionLevel", "JobLevelB", "YearsWithCurrentManager", 
+              "MaritalStatus", "JobRole", "YearsInCurrentRole", "Age", "YearsAtCompany", "JobSatisfaction",
+              "YearsSinceLastPromotion", "TotalWorkingYears", "JobInvolvementB", "NumCompaniesWorkedB",
+              "EnviornmentSatisfactionB")
+
+# COMMENTED OUT TO AVOID RERUNNING
+#svm_rs3 <- randomsearch_svm(df=df, 
+#                            features=features,
+#                            kernel_types= c("polynomial"), 
+#                            degree_lower=2,
+#                            degree_upper=3,
+#                            gamma_lower=8,
+#                            gamma_upper=12,
+#                            cost_lower=6,
+#                            cost_upper=10,
+#                            max_iterations=500)
+
+
+# Metrics for data the model was not trained on (average test set metrics from 10 fold cross validation)
+# svm_rs3$tuner$y
+
+# Metrics for data the model was trained on, after refitting on full data set
+# svm_rs3$metrics
+
+# Best hyperparameters found by cross validation
+# svm_rs3$tuner$x
+
+```
+
+
+
+
+```{r}
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("OverTime", "Salary", "StockOptionLevel", "JobLevelB", "MaritalStatus", "JobRole", "YearsAtCompany", "JobSatisfaction",
+              "JobInvolvementB", "NumCompaniesWorkedB", "EnviornmentSatisfactionB")
+
+# COMMENTED OUT TO AVOID RERUNNING
+# svm_rs4 <- randomsearch_svm(df=df, 
+#                             features=features,
+#                             kernel_types= c("polynomial"), 
+#                             degree_lower=2,
+#                             degree_upper=3,
+#                             gamma_lower=8,
+#                             gamma_upper=12,
+#                             cost_lower=6,
+#                             cost_upper=10,
+#                             max_iterations=500)
+
+# Metrics for data the model was not trained on (average test set metrics from 10 fold cross validation)
+# svm_rs4$tuner$y
+
+# Metrics for data the model was trained on, after refitting on full data set
+# svm_rs4$metrics
+
+# Best hyperparameters found by cross validation
+# svm_rs4$tuner$x
+
+```
+
+```{r}
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("OverTime", "JobLevelB", "StockOptionLevel","JobInvolvementB", "MaritalStatus",  "WorkLifeBalanceB", "Salary", "JobRole")
+
+# COMMENTED OUT TO AVOID RERUNNING
+# svm_rs5 <- randomsearch_svm(df=df, 
+#                             features=features,
+#                             kernel_types= c("polynomial"), 
+#                             degree_lower=3,
+#                             degree_upper=3,
+#                             gamma_lower=8,
+#                             gamma_upper=11,
+#                             cost_lower=5,
+#                             cost_upper=9,
+#                             max_iterations=100)
+
+# Metrics for data the model was not trained on (average test set metrics from 10 fold cross validation)
+# svm_rs5$tuner$y
+
+# Metrics for data the model was trained on, after refitting on full data set
+# svm_rs5$metrics
+
+# Best hyperparameters found by cross validation
+# svm_rs5$tuner$x
+
+```
+
+
+
+```{r}
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("OverTime", "JobLevelB", "StockOptionLevel","JobInvolvementB", "MaritalStatus", "Salary_Scaled", "JobRole")
+
+# COMMENTED OUT TO AVOID RERUNNING
+# svm_rs6 <- randomsearch_svm(df=df, 
+#                            features=features,
+#                             degree_lower=2,
+#                             degree_upper=3,
+#                             gamma_lower=7,
+#                             gamma_upper=12,
+#                             cost_lower=5,
+#                             cost_upper=8,
+#                             max_iterations=1000)
+
+
+# Metrics for data the model was not trained on (average test set metrics from 10 fold cross validation)
+# svm_rs6$tuner$y
+
+# Metrics for data the model was trained on, after refitting on full data set
+# svm_rs6$metrics
+
+# Best hyperparameters found by cross validation
+# svm_rs6$tuner$x
+
+```
+
+
+```{r}
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+# COMMENTED OUT TO AVOID RERUNNING
+features <- c("EnvironmentSatisfaction", "OverTime", "Salary", "JobSatisfaction","MaritalStatus", "Age", 
+              "DistanceFromHome", "JobRole", "StockOptionLevel", "YearsAtCompany", "Education", "TotalWorkingYears",
+              "YearsInCurrentRole", "BusinessTravel", "EducationField", "Department","YearsWithCurrManager", 
+              "Gender", "PercentSalaryHike", "PerformanceRating","TrainingTimesLastYear", "YearsSinceLastPromotion",
+              "RelationshipSatisfactionB", "WorkLifeBalanceB","NumCompaniesWorkedB", "JobLevelB", "JobInvolvementB",
+              "EnvironmentSatisfactionB", "Attrition")
+
+# COMMENTED OUT TO AVOID RERUNNING
+# svm_rs7 <- randomsearch_svm(df=df, 
+#                             features=features,
+#                             kernel_types = c("polynomial"),
+#                             degree_lower=2,
+#                             degree_upper=2,
+#                             gamma_lower=7,
+#                             gamma_upper=13,
+#                             cost_lower=5,
+#                             cost_upper=11,
+#                             perform_feature_selection = TRUE,
+#                             max_iterations=250)
+
+# Metrics for data the model was not trained on (average test set metrics from 10 fold cross validation)
+# svm_rs7$tuner$y
+
+# Metrics for data the model was trained on, after refitting on full data set
+# svm_rs7$metrics
+
+# Best hyperparameters found by cross validation
+# svm_rs7$tuner$x
+
+# svm_rs7$features
+
+```
+
+
+```{r}
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("OverTime", "JobLevelB", "StockOptionLevel", "JobInvolvementB", "MaritalStatus", "WorkLifeBalanceB",
+              "Salary", "JobRole", "YearsAtCompany", "JobSatisfaction", "EnviornmentSatisfactionB", "NumCompaniesWorkedB",
+              "JobSatisfaction", "YearsAtCompany", "Attrition")
+
+# COMMENTED OUT TO AVOID RERUNNING
+# svm_rs8 <- randomsearch_svm(df=df, 
+#                             features=features,
+#                             kernel_types = c("polynomial"),
+#                             degree_lower=2,
+#                             degree_upper=2,
+#                             gamma_lower=7,
+#                             gamma_upper=13,
+#                             cost_lower=5,
+#                             cost_upper=11,
+#                             perform_feature_selection = TRUE,
+#                             max_iterations=250)
+
+# Metrics for data the model was not trained on (average test set metrics from 10 fold cross validation)
+# svm_rs8$tuner$y
+
+# Metrics for data the model was trained on, after refitting on full data set
+# svm_rs8$metrics
+
+# Best hyperparameters found by cross validation
+# svm_rs8$tuner$x
+
+# Features that were selected
+# svm_rs8$features
+
+```
+
+# PART 3: MODELING INCOME
+```{r}
+
+df <- read.csv("./CaseStudy2-data.csv")
+df <- clean_data(df)
+
+features <- c("Education", "StockOptionLevel", "JobLevel", "Department", "YearsAtCompany", "JobSatisfaction",
+              "MaritalStatus", "OverTime", "JobRole", "JobInvolvement", "Age", "EducationField", "WorkLifeBalance",
+              "Gender")
+
+# Checking performance of ALL POSSIBLE subset models using cross validation
+# COMMENTED OUT TO AVOID RERUNNING (the .csv is all that is needed now).
+# all_possible_test_cv <- cv_feature_sets(df=df, 
+#                                         features=features,
+#                                         response_var="MonthlyIncome",
+#                                         feature_set_type="all_possible",
+#                                         save_path = "./MIncome_Preds_All_Subsets_14.csv",
+#                                         cv_folds = 10,
+#                                         cv_type="repeatedcv",
+#                                         cv_repeats = 3)
+
+
+salary_prediction_df <- read.csv("./MIncome_Preds_All_Subsets_14.csv")
+head(salary_prediction_df)
+```
+
+
+
